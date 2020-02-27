@@ -1,6 +1,9 @@
 ﻿{
     "DocumentRoot": ".",
     "Port": "8080",
+	"ThreadPoolSize" : "10",                                 
+    "AllowThreadModel" : "Pool|Multi|Single",                          //thread model selection
+    "ThreadModel" : "Single",                                          //Chahge Thread Model Here
     "Plugins" : [
         {
             "Path" : "stat",

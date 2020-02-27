@@ -248,11 +248,13 @@ namespace DNWS
         protected Socket clientSocket;
         private static DotNetWebServer _instance = null;
         protected int id;
+        protected int MaxThread;                                                       //Max Thread pool select from config.json
+        protected String ThreadModel;                                                  //Thread model select from config.json
 
         private DotNetWebServer(Program parent)
         {
             _parent = parent;
-            id = 0;
+            id = 0;                  
         }
 
         /// <summary>
@@ -281,12 +283,78 @@ namespace DNWS
         public void Start()
         {
             _port = Convert.ToInt32(Program.Configuration["Port"]);
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, _port);
+            ThreadModel = Program.Configuration["ThreadModel"];                                        //Thread model select from config.json
+
+            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Any, _port);                           //server socket endpoint
             // Create listening socket, queue size is 5 now.
             serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             serverSocket.Bind(localEndPoint);
             serverSocket.Listen(5);
             _parent.Log("Server started at port " + _port + ".");
+            _parent.Log("Thread model : " + ThreadModel);
+
+            if (ThreadModel is "Pool")
+            {
+                int minWorker, minIOC;
+                MaxThread = Convert.ToInt32(Program.Configuration["ThreadPoolSize"]);                      //Max thread = threadpool from config           
+
+                ThreadPool.GetMinThreads(out minWorker, out minIOC);
+
+                if (MaxThread < minWorker || MaxThread < minIOC)
+                {
+                    MaxThread = (minWorker < minIOC) ? minIOC : minWorker;
+                }
+
+                ThreadPool.SetMaxThreads(MaxThread, MaxThread);                                        //set max threads
+                _parent.Log("Max pool size is " + MaxThread);
+            }
+
+            if (ThreadModel is "Single")
+            {
+                SigleThreadF();
+            }
+            else if (ThreadModel is "Multi")
+            {
+                MultiThreadF();
+            }
+            else if (ThreadModel is "Pool")
+            {
+                ThreadPoolF();
+            }
+            else
+            {
+                _parent.Log("Error : Please check config.json \n");
+            }
+
+
+
+        }
+
+        private void ThreadPoolF()
+        {
+            while (true)
+            {
+                try
+                {
+                    // Wait for client
+                    clientSocket = serverSocket.Accept();
+                    // Get one, show some info
+                    _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
+                    HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
+
+                    TaskInfo ti = new TaskInfo(hp);
+                    ThreadPool.QueueUserWorkItem(ThreadProc, ti);                                          //queue the task
+                }
+                catch (Exception ex)
+                {
+                    _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
+                }
+            }
+        }
+
+
+        private void SigleThreadF()
+        {
             while (true)
             {
                 try
@@ -304,5 +372,29 @@ namespace DNWS
                 }
             }
         }
+
+        private void MultiThreadF()
+        {
+            while (true)
+            {
+                try
+                {
+                    // Wait for client
+                    clientSocket = serverSocket.Accept();
+                    // Get one, show some info
+                    _parent.Log("Client accepted:" + clientSocket.RemoteEndPoint.ToString());
+                    HTTPProcessor hp = new HTTPProcessor(clientSocket, _parent);
+                    Thread thread = new Thread(new ThreadStart(hp.Process));
+                    id++;
+                    thread.Start();
+                }
+                catch (Exception ex)
+                {
+                    _parent.Log("Server starting error: " + ex.Message + "\n" + ex.StackTrace);
+                }
+            }
+        }
+
+
     }
 }

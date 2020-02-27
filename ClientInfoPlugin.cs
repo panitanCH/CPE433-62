@@ -1,16 +1,17 @@
 using System;
 using System.Text;
 
+
 namespace DNWS
 {
  
-    public class ClientInfoPlugin : IPlugin
+    public class InfoPlugin : IPlugin
     {        
         public HTTPResponse GetResponse(HTTPRequest request)
         {
             StringBuilder sb = new StringBuilder();
 
-            string[] client_endpoint = request.getPropertyByKey("RemoteEndPoint").Split(':');
+            string[] client_endpoint = request.getPropertyByKey("RemoteEndPoint").Split(':'); //get info of client frome remote endpoint
 
             string val;
 
